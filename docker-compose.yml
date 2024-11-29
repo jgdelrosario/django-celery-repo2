@@ -1,0 +1,33 @@
+version: '3.9'
+
+services:
+  django:
+    build: .
+    volumes:
+      - ./django_project:/app
+      - ./wait-for-it.sh:/wait-for-it.sh
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    entrypoint: ["bash", "/wait-for-it.sh", "redis:6379", "--", "python", "manage.py", "runserver", "0.0.0.0:8000"]
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+
+  celery:
+    build: .
+    command: ["bash", "/wait-for-it.sh", "redis:6379", "--", "celery", "-A", "django_project", "worker", "--loglevel=info", "--concurrency=4"]
+
+    volumes:
+      - ./django_project:/app
+      - ./wait-for-it.sh:/wait-for-it.sh
+    depends_on:
+      - redis
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
